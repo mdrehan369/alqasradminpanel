@@ -1,29 +1,31 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { getAuthToken } from "@/lib/api"
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { clearAuthToken } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { AUTH_KEYS } from "@/lib/constants";
+import { getAuth } from "@/queries/auth";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const isAuthRoute = pathname === "/signin"
-  const [ready, setReady] = useState(false)
+    const router = useRouter();
+    const pathname = usePathname();
+    const isAuthRoute = pathname === "/signin";
 
-  useEffect(() => {
-    const token = getAuthToken()
-    if (isAuthRoute) {
-      if (token) router.replace("/")
-      else setReady(true)
-      return
-    }
-    if (!token) {
-      router.replace("/signin")
-      return
-    }
-    setReady(true)
-  }, [isAuthRoute, pathname, router])
+    const { data: isLoggedin, isFetching } = useQuery<boolean>({
+        queryKey: AUTH_KEYS,
+        queryFn: getAuth,
+        initialData: false,
+    });
 
-  if (!ready && !isAuthRoute) return null
-  return <>{children}</>
+    useEffect(() => {
+        if (isLoggedin && isAuthRoute) router.replace("/");
+        else if (!isFetching && !isLoggedin) {
+            clearAuthToken();
+            router.replace("/signin");
+        }
+    }, [isFetching]);
+
+    if (isFetching) return;
+    return <>{children}</>;
 }
